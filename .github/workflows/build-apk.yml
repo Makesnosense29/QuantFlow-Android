@@ -6,6 +6,7 @@ on:
     branches: [ main ]
     paths:
       - 'QuantFlow_V8_18_2_OneTap_Android_Project*.zip'
+      - 'simple_dashboard.html'
       - '.github/workflows/build-apk.yml'
 
 jobs:
@@ -36,7 +37,19 @@ jobs:
           rm -rf buildsrc
           mkdir buildsrc
           unzip -q "$ZIP" -d buildsrc
-          find buildsrc -maxdepth 3 -type f | head -80
+          PROJECT_DIR="$(find buildsrc -mindepth 1 -maxdepth 1 -type d | head -1)"
+          test -n "$PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          find "$PROJECT_DIR" -maxdepth 3 -type f | head -80
+
+      - name: Install simplified dashboard only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f simple_dashboard.html
+          test -f "$PROJECT_DIR/app/src/main/assets/bot_seed/index.html"
+          cp simple_dashboard.html "$PROJECT_DIR/app/src/main/assets/bot_seed/index.html"
+          test "$(grep -c 'HEUTE · UNTERM STRICH' "$PROJECT_DIR/app/src/main/assets/bot_seed/index.html")" -eq 1
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -66,9 +79,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PROJECT_DIR="$(find buildsrc -mindepth 1 -maxdepth 1 -type d | head -1)"
-          test -n "$PROJECT_DIR"
-          echo "Project: $PROJECT_DIR"
           cd "$PROJECT_DIR"
           gradle :app:assembleDebug --stacktrace
 
@@ -78,12 +88,12 @@ jobs:
           set -euo pipefail
           APK="$(find buildsrc -path '*/app/build/outputs/apk/debug/app-debug.apk' | head -1)"
           test -n "$APK"
-          cp "$APK" QuantFlow-V8.18.2-forward.apk
-          sha256sum QuantFlow-V8.18.2-forward.apk
+          cp "$APK" QuantFlow-V8.18.2-SimpleDashboard.apk
+          sha256sum QuantFlow-V8.18.2-SimpleDashboard.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: QuantFlow-V8.18.2-forward-APK
-          path: QuantFlow-V8.18.2-forward.apk
+          name: QuantFlow-V8.18.2-SimpleDashboard-APK
+          path: QuantFlow-V8.18.2-SimpleDashboard.apk
           if-no-files-found: error
