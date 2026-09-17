@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>QuantFlow – Einfaches Dashboard</title>
+<style>
+:root{color-scheme:dark;--bg:#071018;--card:#101b26;--card2:#162332;--text:#f4f7fb;--muted:#93a4b7;--line:#253548;--good:#54e39a;--bad:#ff7272;--warn:#ffd166;--blue:#72b7ff}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.wrap{max-width:900px;margin:0 auto;padding:16px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 16px}.title{font-size:24px;font-weight:900;letter-spacing:.2px}.sub{color:var(--muted);font-size:13px;margin-top:3px}.pill{padding:9px 12px;border-radius:999px;font-size:13px;font-weight:800;background:#173023;color:var(--good);border:1px solid #285b3f;white-space:nowrap}.pill.bad{background:#391b1b;color:#ffb0b0;border-color:#6c3030}.pill.warn{background:#3a3016;color:#ffe39a;border-color:#6e5a28}
+.hero{background:linear-gradient(180deg,#142333,#0f1a25);border:1px solid var(--line);border-radius:22px;padding:18px;margin-bottom:14px;box-shadow:0 12px 35px rgba(0,0,0,.22)}.eyebrow{font-size:13px;font-weight:900;color:var(--muted);letter-spacing:1.2px}.net{font-size:44px;line-height:1.05;font-weight:950;margin:8px 0 4px}.net.good,.money.good{color:var(--good)}.net.bad,.money.bad{color:var(--bad)}.net.zero,.money.zero{color:var(--text)}.caption{font-size:14px;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.mini{background:#0c1620;border:1px solid var(--line);border-radius:16px;padding:14px}.mini .lab{color:var(--muted);font-size:13px;font-weight:800}.mini .val{font-size:23px;font-weight:950;margin-top:6px}.mini .hint{color:var(--muted);font-size:12px;margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px}.label{color:var(--muted);font-size:13px;font-weight:800}.value{font-size:24px;font-weight:950;margin-top:6px}.small{font-size:12px;color:var(--muted);margin-top:4px}
+.section{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;margin-bottom:14px}.section h2{font-size:18px;margin:0 0 12px}.section h3{font-size:15px;margin:14px 0 8px;color:#dce7f3}.message{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:13px;line-height:1.45}.message.good{border-color:#2b6245}.message.bad{border-color:#713535;background:#281619}.message.warn{border-color:#725f2e;background:#282316}
+.pos{padding:12px 0;border-top:1px solid var(--line)}.pos:first-child{border-top:0;padding-top:0}.row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.name{font-weight:900}.muted{color:var(--muted)}.right{text-align:right}.money{font-weight:950}.badge{display:inline-block;border-radius:999px;padding:4px 8px;background:#1c2a39;color:#c6d5e5;font-size:11px;font-weight:800;margin-left:6px}
+.trade{display:grid;grid-template-columns:64px 1fr auto;gap:10px;padding:11px 0;border-top:1px solid var(--line);align-items:center}.trade:first-child{border-top:0}.trade .time{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px}.trade .sym{font-weight:900}.trade .act{font-size:12px;color:var(--muted)}.empty{color:var(--muted);padding:8px 0}.footer{color:var(--muted);font-size:12px;text-align:center;padding:4px 0 18px}.refresh{font-variant-numeric:tabular-nums}
+details{background:#0c1620;border:1px solid var(--line);border-radius:14px;padding:12px}summary{cursor:pointer;font-weight:800}.kv{display:grid;grid-template-columns:1fr auto;gap:8px;font-size:13px;padding-top:10px}.kv div:nth-child(odd){color:var(--muted)}
+@media(max-width:520px){.wrap{padding:12px}.title{font-size:21px}.net{font-size:39px}.grid{grid-template-columns:1fr 1fr}.value{font-size:21px}.top{align-items:flex-start}.pill{font-size:12px;padding:8px 10px}.trade{grid-template-columns:54px 1fr auto}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><div class="title">QuantFlow</div><div class="sub">PAPER · nur Anzeige · keine Knöpfe zum Handeln</div></div>
+    <div id="statusPill" class="pill warn">Verbinde …</div>
+  </div>
+
+  <section class="hero">
+    <div class="eyebrow">HEUTE · UNTERM STRICH</div>
+    <div id="todayNet" class="net zero">0,00 €</div>
+    <div class="caption">Enthält realisierte Ergebnisse und den aktuellen Wert offener Positionen.</div>
+    <div class="two">
+      <div class="mini"><div class="lab">GEWINNE HEUTE</div><div id="todayWins" class="val money good">+0,00 €</div><div class="hint">Positive Buchungen aus heutigen Trades</div></div>
+      <div class="mini"><div class="lab">VERLUSTE / KOSTEN HEUTE</div><div id="todayLosses" class="val money bad">-0,00 €</div><div class="hint">Negative Buchungen inkl. Paper-Gebühren</div></div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <div class="card"><div class="label">Kontowert</div><div id="equity" class="value">—</div><div class="small">Bargeld + offene Positionen</div></div>
+    <div class="card"><div class="label">Bargeld frei</div><div id="cash" class="value">—</div><div class="small">Noch nicht investiert</div></div>
+    <div class="card"><div class="label">Offene Positionen</div><div id="positionCount" class="value">0</div><div class="small">Gerade im Markt</div></div>
+    <div class="card"><div class="label">Trades heute</div><div id="tradesToday" class="value">0</div><div id="realizedToday" class="small">Realisiert: 0,00 €</div></div>
+  </div>
+
+  <section class="section">
+    <h2>Was macht der Bot gerade?</h2>
+    <div id="plainStatus" class="message warn">Daten werden geladen …</div>
+  </section>
+
+  <section class="section">
+    <h2>Offene Positionen</h2>
+    <div id="positions"><div class="empty">Noch keine Daten.</div></div>
+  </section>
+
+  <section class="section">
+    <h2>Letzte Aktionen</h2>
+    <div id="trades"><div class="empty">Noch keine Trades.</div></div>
+  </section>
+
+  <section class="section">
+    <h2>Einfach erklärt</h2>
+    <div class="message">
+      <b>Grün</b> = Gewinn. <b>Rot</b> = Verlust oder Kosten. <b>Kontowert</b> = was dein Paper-Konto aktuell insgesamt wert ist. <b>Offene Positionen</b> = Käufe, die noch nicht vollständig verkauft wurden.
+    </div>
+    <div style="height:10px"></div>
+    <details>
+      <summary>Technische Details anzeigen</summary>
+      <div class="kv">
+        <div>Version</div><div id="version">—</div>
+        <div>Scanner</div><div id="scanner">—</div>
+        <div>Datenalter</div><div id="age">—</div>
+        <div>Letzte Aktualisierung</div><div id="updated">—</div>
+      </div>
+    </details>
+  </section>
+
+  <div class="footer">Dashboard wird automatisch aktualisiert · <span id="clock" class="refresh">—</span></div>
+</div>
+<script>
+const eur = n => Number(n||0).toLocaleString('de-DE',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2});
+const signed = n => `${Number(n||0)>=0?'+':''}${eur(n)}`;
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => { const n=Number(v); return Number.isFinite(n)?n:0; };
+function moneyClass(el,n){el.classList.remove('good','bad','zero');el.classList.add(n>0?'good':n<0?'bad':'zero')}
+function localDayKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function parseTime(s){const d=new Date(s);return Number.isNaN(d.getTime())?null:d}
+function todayTradeStats(rows){
+  const key=localDayKey(new Date()); let wins=0,losses=0,net=0,count=0;
+  for(const r of (rows||[])){
+    const d=parseTime(r.time); if(!d || localDayKey(d)!==key) continue;
+    const p=num(r.pnl_eur); net+=p; count++;
+    if(p>0) wins+=p; else if(p<0) losses+=p;
+  }
+  return {wins,losses,net,count};
+}
+function statusInfo(d){
+  if(d.error) return ['Datenfehler','bad','Die App kann die Bot-Daten gerade nicht lesen. Der Bot selbst wird dadurch nicht verändert.'];
+  if(d.drawdown_halt) return ['Sicherheitsstopp','bad','Der Drawdown-Schutz hat den Bot angehalten. Es werden keine neuen Käufe eröffnet.'];
+  if(d.daily_halt) return ['Tageslimit erreicht','warn','Der Tages-Schutz ist aktiv. Der Bot wartet bis zum nächsten Handelstag.'];
+  if(d.stale) return ['Daten veraltet','bad','Es kommen gerade keine frischen Bot-Daten. Prüfe die App bzw. die Verbindung.'];
+  if(d.scan_running) return ['Bot läuft','good','Der Bot sucht gerade nach passenden Chancen. Kein Handeln nötig.'];
+  const text=String(d.status||'').trim();
+  return ['Bot läuft','good', text || 'Der Bot ist aktiv und wartet auf die nächste passende Gelegenheit.'];
+}
+function positionPnl(p,d){
+  const entry=num(p.entry_price),price=num(p.current_price),inv=num(p.invested_eur)*num(p.remaining_fraction||1);
+  if(!entry||!price) return 0;
+  const rate=(num(d?.config?.paper_slippage_pct)+num(d?.config?.paper_fee_pct))/100;
+  const value=inv*(price/entry); return value-inv-(value*rate);
+}
+function renderPositions(d){
+  const root=document.getElementById('positions'); const ps=d.positions||[];
+  if(!ps.length){root.innerHTML='<div class="empty">Keine offenen Positionen. Das ist völlig normal – der Bot wartet dann einfach.</div>';return}
+  root.innerHTML=ps.map(p=>{
+    const pnl=positionPnl(p,d), pct=num(p.change_pct), cls=pnl>0?'good':pnl<0?'bad':'zero';
+    return `<div class="pos"><div class="row"><div><div class="name">${esc(p.symbol||'?')} <span class="badge">${esc(p.chain||'')}</span></div><div class="small">Einsatz: ${eur(num(p.invested_eur)*num(p.remaining_fraction||1))}</div></div><div class="right"><div class="money ${cls}">${signed(pnl)}</div><div class="small">Kurs ${pct>=0?'+':''}${pct.toFixed(2)} %</div></div></div></div>`
+  }).join('');
+}
+function renderTrades(rows){
+  const root=document.getElementById('trades'); const list=[...(rows||[])].slice(-10).reverse();
+  if(!list.length){root.innerHTML='<div class="empty">Noch keine Aktionen gespeichert.</div>';return}
+  root.innerHTML=list.map(r=>{
+    const d=parseTime(r.time),t=d?d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'—';
+    const p=num(r.pnl_eur), cls=p>0?'good':p<0?'bad':'zero'; const a=String(r.action||'').toUpperCase();
+    const action=a==='BUY'?'Kauf':a==='SELL'?'Verkauf':a;
+    return `<div class="trade"><div class="time">${t}</div><div><div class="sym">${esc(r.symbol||'?')}</div><div class="act">${esc(action)} · ${esc(String(r.reason||'').split(';').slice(-1)[0]||'')}</div></div><div class="money ${cls}">${p===0?'—':signed(p)}</div></div>`
+  }).join('');
+}
+function render(d){
+  const stat=todayTradeStats(d.trades);
+  const net=num(d.total_today_pnl_eur), netEl=document.getElementById('todayNet'); netEl.textContent=signed(net); moneyClass(netEl,net);
+  document.getElementById('todayWins').textContent=signed(stat.wins);
+  document.getElementById('todayLosses').textContent=eur(stat.losses);
+  document.getElementById('equity').textContent=eur(d.portfolio_value);
+  document.getElementById('cash').textContent=eur(d.cash_eur);
+  document.getElementById('positionCount').textContent=String(d.position_count||0);
+  document.getElementById('tradesToday').textContent=String(d.trades_today??stat.count);
+  document.getElementById('realizedToday').textContent=`Realisiert: ${signed(num(d.day_realized_pnl_eur))}`;
+  const [pill,kind,msg]=statusInfo(d), pe=document.getElementById('statusPill'); pe.textContent=pill; pe.className=`pill ${kind==='good'?'':kind}`;
+  const me=document.getElementById('plainStatus'); me.textContent=msg; me.className=`message ${kind}`;
+  document.getElementById('version').textContent=d.version||d.instance||'—';
+  document.getElementById('scanner').textContent=d.scan_running?'sucht gerade':'wartet';
+  document.getElementById('age').textContent=d.scan_age_seconds==null?'—':`${Math.round(num(d.scan_age_seconds))} s`;
+  document.getElementById('updated').textContent=new Date().toLocaleTimeString('de-DE');
+  renderPositions(d); renderTrades(d.trades);
+}
+async function refresh(){
+  try{
+    const r=await fetch('/api/status',{cache:'no-store'}); const d=await r.json(); render(d);
+  }catch(e){
+    const pe=document.getElementById('statusPill');pe.textContent='Keine Verbindung';pe.className='pill bad';
+    const me=document.getElementById('plainStatus');me.textContent='Das Dashboard erreicht den Bot gerade nicht. Die Handelslogik wurde nicht verändert.';me.className='message bad';
+  }
+}
+setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString('de-DE'),1000);
+refresh(); setInterval(refresh,3000);
+</script>
+</body>
+</html>
