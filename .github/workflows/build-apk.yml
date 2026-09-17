@@ -5,7 +5,8 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'QuantFlow_V8_18_2_OneTap_Android_Project.zip'
+      - 'QuantFlow_V8_18_2_OneTap_Android_Project*.zip'
+      - '.github/workflows/build-apk.yml'
 
 jobs:
   build:
@@ -16,17 +17,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify source archive
+      - name: Locate and verify source archive
+        shell: bash
         run: |
-          test -f QuantFlow_V8_18_2_OneTap_Android_Project.zip
-          sha256sum QuantFlow_V8_18_2_OneTap_Android_Project.zip
+          set -euo pipefail
+          ZIP="$(find . -maxdepth 1 -type f -name 'QuantFlow_V8_18_2_OneTap_Android_Project*.zip' | sort | head -1)"
+          test -n "$ZIP"
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+          sha256sum "$ZIP"
 
       - name: Extract Android project
+        shell: bash
         run: |
+          set -euo pipefail
           rm -rf buildsrc
           mkdir buildsrc
-          unzip -q QuantFlow_V8_18_2_OneTap_Android_Project.zip -d buildsrc
-          find buildsrc -maxdepth 2 -type f | head -50
+          unzip -q "$ZIP" -d buildsrc
+          find buildsrc -maxdepth 3 -type f | head -80
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -46,14 +53,19 @@ jobs:
           gradle-version: '8.11.1'
 
       - name: Build debug APK
+        shell: bash
         run: |
+          set -euo pipefail
           PROJECT_DIR="$(find buildsrc -mindepth 1 -maxdepth 1 -type d | head -1)"
+          test -n "$PROJECT_DIR"
           echo "Project: $PROJECT_DIR"
           cd "$PROJECT_DIR"
           gradle :app:assembleDebug --stacktrace
 
       - name: Collect APK
+        shell: bash
         run: |
+          set -euo pipefail
           APK="$(find buildsrc -path '*/app/build/outputs/apk/debug/app-debug.apk' | head -1)"
           test -n "$APK"
           cp "$APK" QuantFlow-V8.18.2-forward.apk
