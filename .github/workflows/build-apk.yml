@@ -6,7 +6,8 @@ on:
     branches: [ main ]
     paths:
       - 'QuantFlow_V8_18_2_OneTap_Android_Project*.zip'
-      - 'simple_dashboard.html'
+      - 'dashboard_v2.html.gz.b64'
+      - 'mobile_app_v2.py.gz.b64'
       - '.github/workflows/build-apk.yml'
 
 jobs:
@@ -40,16 +41,18 @@ jobs:
           PROJECT_DIR="$(find buildsrc -mindepth 1 -maxdepth 1 -type d | head -1)"
           test -n "$PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          find "$PROJECT_DIR" -maxdepth 3 -type f | head -80
 
-      - name: Install simplified dashboard only
+      - name: Install dashboard and analytics update
         shell: bash
         run: |
           set -euo pipefail
-          test -f simple_dashboard.html
-          test -f "$PROJECT_DIR/app/src/main/assets/bot_seed/index.html"
-          cp simple_dashboard.html "$PROJECT_DIR/app/src/main/assets/bot_seed/index.html"
-          test "$(grep -c 'HEUTE · UNTERM STRICH' "$PROJECT_DIR/app/src/main/assets/bot_seed/index.html")" -eq 1
+          base64 -d dashboard_v2.html.gz.b64 | gzip -dc > "$PROJECT_DIR/app/src/main/assets/bot_seed/index.html"
+          base64 -d mobile_app_v2.py.gz.b64 | gzip -dc > "$PROJECT_DIR/app/src/main/python/mobile_app.py"
+          python3 -m py_compile "$PROJECT_DIR/app/src/main/python/mobile_app.py"
+          grep -q 'Tage im Vergleich' "$PROJECT_DIR/app/src/main/assets/bot_seed/index.html"
+          grep -q 'daily_history' "$PROJECT_DIR/app/src/main/python/mobile_app.py"
+          sed -i "s/versionCode 2/versionCode 3/" "$PROJECT_DIR/app/build.gradle"
+          sed -i "s/versionName '8.18.2-forward-onetap-2'/versionName '8.18.2-dashboard-pro-3'/" "$PROJECT_DIR/app/build.gradle"
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -66,7 +69,6 @@ jobs:
             SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -V | tail -1)"
           fi
           test -x "$SDKMANAGER"
-          echo "Using sdkmanager: $SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" 'platform-tools' 'platforms;android-35' 'build-tools;35.0.0'
 
@@ -88,12 +90,12 @@ jobs:
           set -euo pipefail
           APK="$(find buildsrc -path '*/app/build/outputs/apk/debug/app-debug.apk' | head -1)"
           test -n "$APK"
-          cp "$APK" QuantFlow-V8.18.2-SimpleDashboard.apk
-          sha256sum QuantFlow-V8.18.2-SimpleDashboard.apk
+          cp "$APK" QuantFlow-V8.18.2-DashboardPro.apk
+          sha256sum QuantFlow-V8.18.2-DashboardPro.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: QuantFlow-V8.18.2-SimpleDashboard-APK
-          path: QuantFlow-V8.18.2-SimpleDashboard.apk
+          name: QuantFlow-V8.18.2-DashboardPro-APK
+          path: QuantFlow-V8.18.2-DashboardPro.apk
           if-no-files-found: error
