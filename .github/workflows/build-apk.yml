@@ -169,6 +169,10 @@ jobs:
           gradle = gradle_path.read_text(encoding="utf-8")
           gradle = re.sub(r"versionCode\s+\d+", "versionCode 4", gradle, count=1)
           gradle = re.sub(r"versionName\s+'[^']+'", "versionName '8.18.3-quality-4'", gradle, count=1)
+          gradle = gradle.replace(
+              "release {\n            minifyEnabled false",
+              "release {\n            debuggable true\n            minifyEnabled false"
+          )
           gradle_path.write_text(gradle, encoding="utf-8")
 
           main = main_path.read_text(encoding="utf-8").replace(
