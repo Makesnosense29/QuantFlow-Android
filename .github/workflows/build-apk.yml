@@ -8,7 +8,7 @@ on:
       - 'QuantFlow_V8_18_2_OneTap_Android_Project*.zip'
       - 'dashboard_v2.html.gz.b64'
       - 'mobile_app_v2.py.gz.b64'
-      - 'bot_v8184.py.gz.b64'
+      - 'bot_v8184.part*.txt'
       - 'config_v8184.json.gz.b64'
       - '.github/workflows/build-apk.yml'
 
@@ -52,7 +52,7 @@ jobs:
 
           base64 -d dashboard_v2.html.gz.b64 | gzip -dc > "$PROJECT_DIR/app/src/main/assets/bot_seed/index.html"
           base64 -d mobile_app_v2.py.gz.b64 | gzip -dc > "$PROJECT_DIR/app/src/main/python/mobile_app.py"
-          base64 -d bot_v8184.py.gz.b64 | gzip -dc > "$PROJECT_DIR/app/src/main/python/bot.py"
+          cat bot_v8184.part*.txt | tr -d '\r\n ' | base64 -d | gzip -dc > "$PROJECT_DIR/app/src/main/python/bot.py"
           base64 -d config_v8184.json.gz.b64 | gzip -dc > "$PROJECT_DIR/app/src/main/assets/bot_seed/config.json"
 
           python3 - "$PROJECT_DIR" <<'PY'
@@ -94,7 +94,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile "$PROJECT_DIR/app/src/main/python/bot.py"
+          echo "36b743378c7b82cc4c8b4359c4d6b2f0eddb0bb144a0dfd58673060f3390d9b0  $PROJECT_DIR/app/src/main/python/bot.py" | sha256sum -c -
+          echo "296ec08da060de45da3b77aa3694642979abbba6df7689b837e5ab3d11822c89  $PROJECT_DIR/app/src/main/assets/bot_seed/config.json" | sha256sum -c -
+                    python3 -m py_compile "$PROJECT_DIR/app/src/main/python/bot.py"
           python3 -m py_compile "$PROJECT_DIR/app/src/main/python/mobile_app.py"
           grep -q 'def adaptive_stop_update' "$PROJECT_DIR/app/src/main/python/bot.py"
           grep -q 'AI_STOP' "$PROJECT_DIR/app/src/main/python/bot.py"
