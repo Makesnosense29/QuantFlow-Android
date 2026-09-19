@@ -142,24 +142,24 @@ jobs:
           cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
           cfg.update({
               "max_open_positions": 2,
-              "max_trades_per_day": 10,
-              "max_daily_loss_eur": 60.0,
+              "max_trades_per_day": 999999999,
+              "max_daily_loss_eur": 999999999.0,
               "stop_cooldown_minutes": 720,
               "normal_cooldown_minutes": 120,
               "entry_confirmations": 3,
               "confirmation_min_price_move_pct": 0.0,
               "confirmation_max_price_move_pct": 1.5,
-              "version": "V8.18.3-quality",
+              "version": "V8.18.3-quality-test",
               "max_drawdown_pct": 2.5,
               "risk_per_trade_pct": 0.15,
               "max_exposure_pct": 5.0,
               "max_entries_per_token_per_day": 1,
               "loss_pause_count": 1,
               "loss_pause_hours": 12,
-              "dashboard_version": "8.18.3-quality",
+              "dashboard_version": "8.18.3-quality-test",
               "global_loss_streak_pause_count": 3,
               "global_loss_streak_pause_minutes": 240,
-              "close_positions_on_daily_halt": True,
+              "close_positions_on_daily_halt": False,
           })
           for profile in cfg.get("chain_profiles", {}).values():
               profile["min_score"] = 9
@@ -167,8 +167,8 @@ jobs:
           cfg_path.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
           gradle = gradle_path.read_text(encoding="utf-8")
-          gradle = re.sub(r"versionCode\s+\d+", "versionCode 4", gradle, count=1)
-          gradle = re.sub(r"versionName\s+'[^']+'", "versionName '8.18.3-quality-4'", gradle, count=1)
+          gradle = re.sub(r"versionCode\s+\d+", "versionCode 5", gradle, count=1)
+          gradle = re.sub(r"versionName\s+'[^']+'", "versionName '8.18.3-quality-test-5'", gradle, count=1)
           gradle = gradle.replace(
               "release {\n            minifyEnabled false",
               "release {\n            debuggable true\n            minifyEnabled false"
@@ -176,19 +176,23 @@ jobs:
           gradle_path.write_text(gradle, encoding="utf-8")
 
           main = main_path.read_text(encoding="utf-8").replace(
-              "V8.18.2-forward · PAPER only", "V8.18.3-quality · PAPER only"
+              "V8.18.2-forward · PAPER only", "V8.18.3-quality-test · PAPER only"
           )
           main_path.write_text(main, encoding="utf-8")
 
           service = service_path.read_text(encoding="utf-8")
-          service = service.replace("V8.18.2-forward startet …", "V8.18.3-quality startet …")
-          service = service.replace("V8.18.2-forward läuft · PAPER only", "V8.18.3-quality läuft · PAPER only")
+          service = service.replace("V8.18.2-forward startet …", "V8.18.3-quality-test startet …")
+          service = service.replace("V8.18.2-forward läuft · PAPER only", "V8.18.3-quality-test läuft · PAPER only")
+          service = service.replace(
+              'boolean immutable = out.getName().equals("config.json") || out.getName().endsWith(".html") ||',
+              'boolean immutable = out.getName().endsWith(".html") ||'
+          )
           service_path.write_text(service, encoding="utf-8")
           PY
 
           python3 -m py_compile "$PROJECT_DIR/app/src/main/python/bot.py"
           python3 -m py_compile "$PROJECT_DIR/app/src/main/python/mobile_app.py"
-          grep -q 'V8.18.3-quality' "$PROJECT_DIR/app/src/main/assets/bot_seed/config.json"
+          grep -q 'V8.18.3-quality-test' "$PROJECT_DIR/app/src/main/assets/bot_seed/config.json"
           grep -q 'global_loss_streak_pause_count' "$PROJECT_DIR/app/src/main/python/bot.py"
           grep -q 'Tage im Vergleich' "$PROJECT_DIR/app/src/main/assets/bot_seed/index.html"
           grep -q 'daily_history' "$PROJECT_DIR/app/src/main/python/mobile_app.py"
