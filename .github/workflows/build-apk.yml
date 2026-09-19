@@ -1,4 +1,4 @@
-name: Build QuantFlow APK
+name: Build QuantFlow V8.18.3 Quality APK
 
 on:
   workflow_dispatch:
@@ -18,6 +18,7 @@ jobs:
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,17 +43,151 @@ jobs:
           test -n "$PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Install dashboard and analytics update
+      - name: Install DashboardPro and V8.18.3 Quality
         shell: bash
         run: |
           set -euo pipefail
+
+          # DashboardPro / analytics server already validated in the previous build.
           base64 -d dashboard_v2.html.gz.b64 | gzip -dc > "$PROJECT_DIR/app/src/main/assets/bot_seed/index.html"
           base64 -d mobile_app_v2.py.gz.b64 | gzip -dc > "$PROJECT_DIR/app/src/main/python/mobile_app.py"
+
+          python3 - "$PROJECT_DIR" <<'PY'
+          from pathlib import Path
+          import json, re, sys
+
+          root = Path(sys.argv[1])
+          bot_path = root / "app/src/main/python/bot.py"
+          cfg_path = root / "app/src/main/assets/bot_seed/config.json"
+          gradle_path = root / "app/build.gradle"
+          main_path = root / "app/src/main/java/de/quantflow/v8182paper/MainActivity.java"
+          service_path = root / "app/src/main/java/de/quantflow/v8182paper/BotService.java"
+
+          bot = bot_path.read_text(encoding="utf-8")
+
+          def once(old, new, label):
+              global bot
+              count = bot.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly 1 anchor, found {count}")
+              bot = bot.replace(old, new, 1)
+
+          once(
+              '        "accounting_version": 2,\n    }',
+              '        "accounting_version": 2,\n'
+              '        "loss_streak": 0,\n'
+              '        "loss_pause_until": 0.0,\n'
+              '    }',
+              "default_state"
+          )
+
+          once(
+              '    s.setdefault("accounting_version", 1)\n'
+              '    restore_token_counts(s)',
+              '    s.setdefault("accounting_version", 1)\n'
+              '    s.setdefault("loss_streak", 0)\n'
+              '    s.setdefault("loss_pause_until", 0.0)\n'
+              '    restore_token_counts(s)',
+              "load_state"
+          )
+
+          once(
+              'def can_open(s, minimum_eur=None):\n'
+              '    equity = update_risk(s)\n'
+              '    if s.get("daily_halt") or s.get("drawdown_halt"):\n',
+              'def can_open(s, minimum_eur=None):\n'
+              '    equity = update_risk(s)\n'
+              '    pause_until = float(s.get("loss_pause_until", 0.0) or 0.0)\n'
+              '    if pause_until > time.time():\n'
+              '        return False\n'
+              '    if pause_until and pause_until <= time.time():\n'
+              '        s["loss_pause_until"] = 0.0\n'
+              '        s["loss_streak"] = 0\n'
+              '    if s.get("daily_halt") or s.get("drawdown_halt"):\n',
+              "can_open pause"
+          )
+
+          once(
+              '    if pos["remaining_fraction"] <= 1e-9:\n'
+              '        del s["positions"][key]\n'
+              '        set_cooldown(s, key, reason)\n',
+              '    if pos["remaining_fraction"] <= 1e-9:\n'
+              '        total_trade_pnl = float(pos.get("exit_net_received_eur", 0.0)) - float(pos.get("entry_gross_eur", 0.0))\n'
+              '        if total_trade_pnl < 0:\n'
+              '            s["loss_streak"] = int(s.get("loss_streak", 0)) + 1\n'
+              '        else:\n'
+              '            s["loss_streak"] = 0\n'
+              '        threshold = int(CONFIG.get("global_loss_streak_pause_count", 0) or 0)\n'
+              '        if threshold > 0 and int(s.get("loss_streak", 0)) >= threshold:\n'
+              '            s["loss_pause_until"] = time.time() + float(CONFIG.get("global_loss_streak_pause_minutes", 0) or 0) * 60.0\n'
+              '        del s["positions"][key]\n'
+              '        set_cooldown(s, key, reason)\n',
+              "loss streak"
+          )
+
+          once(
+              '            record_observation("position_quote", {"key": key, "pair": pair_address, "price": price, "return_pct": ret})\n\n'
+              '            # No artificial minimum hold. A real stop is allowed immediately,\n',
+              '            record_observation("position_quote", {"key": key, "pair": pair_address, "price": price, "return_pct": ret})\n\n'
+              '            update_risk(s)\n'
+              '            if s.get("daily_halt") and CONFIG.get("close_positions_on_daily_halt", False):\n'
+              '                sell_fraction(s, key, p, pos["remaining_fraction"], "DAILY_HALT")\n'
+              '                continue\n\n'
+              '            # No artificial minimum hold. A real stop is allowed immediately,\n',
+              "daily halt flatten"
+          )
+
+          bot_path.write_text(bot, encoding="utf-8")
+
+          cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+          cfg.update({
+              "max_open_positions": 2,
+              "max_trades_per_day": 10,
+              "max_daily_loss_eur": 60.0,
+              "stop_cooldown_minutes": 720,
+              "normal_cooldown_minutes": 120,
+              "entry_confirmations": 3,
+              "confirmation_min_price_move_pct": 0.0,
+              "confirmation_max_price_move_pct": 1.5,
+              "version": "V8.18.3-quality",
+              "max_drawdown_pct": 2.5,
+              "risk_per_trade_pct": 0.15,
+              "max_exposure_pct": 5.0,
+              "max_entries_per_token_per_day": 1,
+              "loss_pause_count": 1,
+              "loss_pause_hours": 12,
+              "dashboard_version": "8.18.3-quality",
+              "global_loss_streak_pause_count": 3,
+              "global_loss_streak_pause_minutes": 240,
+              "close_positions_on_daily_halt": True,
+          })
+          for profile in cfg.get("chain_profiles", {}).values():
+              profile["min_score"] = 9
+              profile["max_buy_sell_ratio"] = 2.5
+          cfg_path.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+          gradle = gradle_path.read_text(encoding="utf-8")
+          gradle = re.sub(r"versionCode\s+\d+", "versionCode 4", gradle, count=1)
+          gradle = re.sub(r"versionName\s+'[^']+'", "versionName '8.18.3-quality-4'", gradle, count=1)
+          gradle_path.write_text(gradle, encoding="utf-8")
+
+          main = main_path.read_text(encoding="utf-8").replace(
+              "V8.18.2-forward · PAPER only", "V8.18.3-quality · PAPER only"
+          )
+          main_path.write_text(main, encoding="utf-8")
+
+          service = service_path.read_text(encoding="utf-8")
+          service = service.replace("V8.18.2-forward startet …", "V8.18.3-quality startet …")
+          service = service.replace("V8.18.2-forward läuft · PAPER only", "V8.18.3-quality läuft · PAPER only")
+          service_path.write_text(service, encoding="utf-8")
+          PY
+
+          python3 -m py_compile "$PROJECT_DIR/app/src/main/python/bot.py"
           python3 -m py_compile "$PROJECT_DIR/app/src/main/python/mobile_app.py"
+          grep -q 'V8.18.3-quality' "$PROJECT_DIR/app/src/main/assets/bot_seed/config.json"
+          grep -q 'global_loss_streak_pause_count' "$PROJECT_DIR/app/src/main/python/bot.py"
           grep -q 'Tage im Vergleich' "$PROJECT_DIR/app/src/main/assets/bot_seed/index.html"
           grep -q 'daily_history' "$PROJECT_DIR/app/src/main/python/mobile_app.py"
-          sed -i "s/versionCode 2/versionCode 3/" "$PROJECT_DIR/app/build.gradle"
-          sed -i "s/versionName '8.18.2-forward-onetap-2'/versionName '8.18.2-dashboard-pro-3'/" "$PROJECT_DIR/app/build.gradle"
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -77,25 +212,25 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Build debug APK
+      - name: Build unsigned release APK
         shell: bash
         run: |
           set -euo pipefail
           cd "$PROJECT_DIR"
-          gradle :app:assembleDebug --stacktrace
+          gradle :app:assembleRelease --stacktrace
 
-      - name: Collect APK
+      - name: Collect unsigned APK
         shell: bash
         run: |
           set -euo pipefail
-          APK="$(find buildsrc -path '*/app/build/outputs/apk/debug/app-debug.apk' | head -1)"
+          APK="$(find buildsrc -path '*/app/build/outputs/apk/release/app-release-unsigned.apk' | head -1)"
           test -n "$APK"
-          cp "$APK" QuantFlow-V8.18.2-DashboardPro.apk
-          sha256sum QuantFlow-V8.18.2-DashboardPro.apk
+          cp "$APK" QuantFlow-V8.18.3-Quality-unsigned.apk
+          sha256sum QuantFlow-V8.18.3-Quality-unsigned.apk
 
-      - name: Upload APK
+      - name: Upload unsigned APK
         uses: actions/upload-artifact@v4
         with:
-          name: QuantFlow-V8.18.2-DashboardPro-APK
-          path: QuantFlow-V8.18.2-DashboardPro.apk
+          name: QuantFlow-V8.18.3-Quality-Unsigned-APK
+          path: QuantFlow-V8.18.3-Quality-unsigned.apk
           if-no-files-found: error
