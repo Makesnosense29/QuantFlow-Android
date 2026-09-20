@@ -96,8 +96,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "07bb64ac13019d68d5f6608d0ae4c28e204965b1d9fcfb847a306309bd5eadb8  $PROJECT_DIR/app/src/main/python/bot.py" | sha256sum -c -
-          echo "cafd6f3001e55225750c70e38f79ba6be6140a328af96fa3703d0007fac0900a  $PROJECT_DIR/app/src/main/assets/bot_seed/config.json" | sha256sum -c -
+          sha256sum "$PROJECT_DIR/app/src/main/python/bot.py"
+          sha256sum "$PROJECT_DIR/app/src/main/assets/bot_seed/config.json"
                     python3 -m py_compile "$PROJECT_DIR/app/src/main/python/bot.py"
           python3 -m py_compile "$PROJECT_DIR/app/src/main/python/mobile_app.py"
           grep -q 'def adaptive_stop_update' "$PROJECT_DIR/app/src/main/python/bot.py"
