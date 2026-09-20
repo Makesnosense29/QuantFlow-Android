@@ -1,4 +1,4 @@
-name: Build QuantFlow V8.18.4 Adaptive PAPER APK
+name: Build QuantFlow V8.18.5 Adaptive Quality PAPER APK
 
 on:
   workflow_dispatch:
@@ -10,6 +10,7 @@ on:
       - 'mobile_app_v2.py.gz.b64'
       - 'bot_v8184.part*.txt'
       - 'config_v8184.json.gz.b64'
+      - 'v8185_patch.py'
       - '.github/workflows/build-apk.yml'
 
 jobs:
@@ -45,7 +46,7 @@ jobs:
           test -n "$PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Install V8.18.4 runtime
+      - name: Install V8.18.5 runtime
         shell: bash
         run: |
           set -euo pipefail
@@ -54,6 +55,7 @@ jobs:
           base64 -d mobile_app_v2.py.gz.b64 | gzip -dc > "$PROJECT_DIR/app/src/main/python/mobile_app.py"
           cat bot_v8184.part*.txt | tr -d '\r\n ' | base64 -d | gzip -dc > "$PROJECT_DIR/app/src/main/python/bot.py"
           base64 -d config_v8184.json.gz.b64 | gzip -dc > "$PROJECT_DIR/app/src/main/assets/bot_seed/config.json"
+          python3 v8185_patch.py "$PROJECT_DIR"
 
           python3 - "$PROJECT_DIR" <<'PY'
           from pathlib import Path
@@ -65,8 +67,8 @@ jobs:
           service_path = root / "app/src/main/java/de/quantflow/v8182paper/BotService.java"
 
           gradle = gradle_path.read_text(encoding="utf-8")
-          gradle = re.sub(r"versionCode\s+\d+", "versionCode 6", gradle, count=1)
-          gradle = re.sub(r"versionName\s+'[^']+'", "versionName '8.18.4-adaptive-paper-6'", gradle, count=1)
+          gradle = re.sub(r"versionCode\s+\d+", "versionCode 7", gradle, count=1)
+          gradle = re.sub(r"versionName\s+'[^']+'", "versionName '8.18.5-adaptive-quality-7'", gradle, count=1)
           if "release {" in gradle and "debuggable true" not in gradle:
               gradle = gradle.replace(
                   "release {\n            minifyEnabled false",
@@ -75,12 +77,12 @@ jobs:
           gradle_path.write_text(gradle, encoding="utf-8")
 
           main = main_path.read_text(encoding="utf-8")
-          main = main.replace("V8.18.2-forward · PAPER only", "V8.18.4-adaptive-paper · PAPER only")
+          main = main.replace("V8.18.2-forward · PAPER only", "V8.18.5-adaptive-quality · PAPER only")
           main_path.write_text(main, encoding="utf-8")
 
           service = service_path.read_text(encoding="utf-8")
-          service = service.replace("V8.18.2-forward startet …", "V8.18.4-adaptive-paper startet …")
-          service = service.replace("V8.18.2-forward läuft · PAPER only", "V8.18.4-adaptive-paper läuft · PAPER only")
+          service = service.replace("V8.18.2-forward startet …", "V8.18.5-adaptive-quality startet …")
+          service = service.replace("V8.18.2-forward läuft · PAPER only", "V8.18.5-adaptive-quality läuft · PAPER only")
 
           # Runtime config must survive app/service restarts; HTML/JS/CSS may still be reseeded.
           service = service.replace(
@@ -94,13 +96,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "36b743378c7b82cc4c8b4359c4d6b2f0eddb0bb144a0dfd58673060f3390d9b0  $PROJECT_DIR/app/src/main/python/bot.py" | sha256sum -c -
-          echo "296ec08da060de45da3b77aa3694642979abbba6df7689b837e5ab3d11822c89  $PROJECT_DIR/app/src/main/assets/bot_seed/config.json" | sha256sum -c -
+          echo "07bb64ac13019d68d5f6608d0ae4c28e204965b1d9fcfb847a306309bd5eadb8  $PROJECT_DIR/app/src/main/python/bot.py" | sha256sum -c -
+          echo "cafd6f3001e55225750c70e38f79ba6be6140a328af96fa3703d0007fac0900a  $PROJECT_DIR/app/src/main/assets/bot_seed/config.json" | sha256sum -c -
                     python3 -m py_compile "$PROJECT_DIR/app/src/main/python/bot.py"
           python3 -m py_compile "$PROJECT_DIR/app/src/main/python/mobile_app.py"
           grep -q 'def adaptive_stop_update' "$PROJECT_DIR/app/src/main/python/bot.py"
+          grep -q 'def short_flow_ok' "$PROJECT_DIR/app/src/main/python/bot.py"
+          grep -q 'position_paths.jsonl' "$PROJECT_DIR/app/src/main/python/bot.py"
+          grep -q 'entry_ai_active' "$PROJECT_DIR/app/src/main/python/bot.py"
           grep -q 'AI_STOP' "$PROJECT_DIR/app/src/main/python/bot.py"
-          grep -q '"version": "V8.18.4-adaptive-paper"' "$PROJECT_DIR/app/src/main/assets/bot_seed/config.json"
+          grep -q '"version": "V8.18.5-adaptive-quality"' "$PROJECT_DIR/app/src/main/assets/bot_seed/config.json"
           grep -q '"max_trades_per_day": 999999999' "$PROJECT_DIR/app/src/main/assets/bot_seed/config.json"
           grep -q '"max_daily_loss_eur": 999999999.0' "$PROJECT_DIR/app/src/main/assets/bot_seed/config.json"
           grep -q '"loss_pause_count": 2' "$PROJECT_DIR/app/src/main/assets/bot_seed/config.json"
@@ -115,7 +120,11 @@ jobs:
           assert bot.CONFIG["paper_unlimited_testing"] is True
           assert bot.CONFIG["adaptive_stop_enabled"] is True
           assert bot.CONFIG["max_drawdown_pct"] == 99.0
-          print("V8.18.4 validation OK")
+          assert bot.CONFIG["entry_confirmations"] == 4
+          assert bot.CONFIG["confirmation_min_price_move_pct"] == 0.05
+          assert bot.CONFIG["fast_v812"]["quick_take_net_pct"] == 4.0
+          assert bot.CONFIG["entry_quality_v818"]["min_m5_buys"] == 3
+          print("V8.18.5 validation OK")
           PY
 
       - name: Set up Java 17
@@ -154,12 +163,12 @@ jobs:
           set -euo pipefail
           APK="$(find buildsrc -path '*/app/build/outputs/apk/release/app-release-unsigned.apk' | head -1)"
           test -n "$APK"
-          cp "$APK" QuantFlow-V8.18.4-Adaptive-PAPER-unsigned.apk
-          sha256sum QuantFlow-V8.18.4-Adaptive-PAPER-unsigned.apk
+          cp "$APK" QuantFlow-V8.18.5-Adaptive-Quality-PAPER-unsigned.apk
+          sha256sum QuantFlow-V8.18.5-Adaptive-Quality-PAPER-unsigned.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: QuantFlow-V8.18.4-Adaptive-PAPER-Unsigned-APK
-          path: QuantFlow-V8.18.4-Adaptive-PAPER-unsigned.apk
+          name: QuantFlow-V8.18.5-Adaptive-Quality-PAPER-Unsigned-APK
+          path: QuantFlow-V8.18.5-Adaptive-Quality-PAPER-unsigned.apk
           if-no-files-found: error
