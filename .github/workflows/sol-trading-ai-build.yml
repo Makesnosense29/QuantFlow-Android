@@ -7,6 +7,12 @@ on:
     paths:
       - ".ci/soltransport/**"
       - ".github/workflows/sol-trading-ai-build.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".ci/soltransport/**"
+      - ".github/workflows/sol-trading-ai-build.yml"
   workflow_dispatch:
 
 jobs:
