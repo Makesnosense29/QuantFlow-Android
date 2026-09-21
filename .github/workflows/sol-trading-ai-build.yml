@@ -1,0 +1,78 @@
+name: SOL Trading AI APK
+
+on:
+  push:
+    branches:
+      - sol-trading-ai-build
+    paths:
+      - ".ci/soltransport/**"
+      - ".github/workflows/sol-trading-ai-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Reconstruct and verify source project
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .ci/soltransport/g00.b64               .ci/soltransport/g01.b64               .ci/soltransport/g02.b64               .ci/soltransport/g03.b64               .ci/soltransport/g04.b64               .ci/soltransport/g05.b64               .ci/soltransport/g06.b64               .ci/soltransport/g07.b64 > /tmp/sol.b64
+          base64 --decode /tmp/sol.b64 > /tmp/sol.zip
+          echo "2c3816796cc21768dd08dc5669a8c8ac067e9fd92c3d95582ab0c300cfb04f47  /tmp/sol.zip" | sha256sum -c -
+          rm -rf /tmp/sol-src
+          mkdir -p /tmp/sol-src
+          unzip -q /tmp/sol.zip -d /tmp/sol-src
+          test -f /tmp/sol-src/SOL-Trading-AI/app/build.gradle.kts
+
+      - name: Ensure Android SDK 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Run unit tests
+        working-directory: /tmp/sol-src/SOL-Trading-AI
+        run: gradle test --stacktrace --no-daemon
+
+      - name: Build debug APK
+        working-directory: /tmp/sol-src/SOL-Trading-AI
+        run: gradle assembleDebug --stacktrace --no-daemon
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="/tmp/sol-src/SOL-Trading-AI/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          sha256sum "$APK"
+          ls -lh "$APK"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SOL-Trading-AI-APK
+          path: /tmp/sol-src/SOL-Trading-AI/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
