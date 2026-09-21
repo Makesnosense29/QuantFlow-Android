@@ -1,0 +1,53 @@
+name: SOL Trading AI APK
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "solapk/**"
+      - ".github/workflows/sol-trading-ai-apk.yml"
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+      - name: Ensure Android SDK 36
+        shell: bash
+        run: |
+          SDKMANAGER="$(command -v sdkmanager || find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -1)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - name: Compile tests
+        working-directory: solapk
+        run: gradle test --stacktrace
+      - name: Build debug APK
+        working-directory: solapk
+        run: gradle assembleDebug --stacktrace
+      - name: Verify APK
+        run: |
+          test -f solapk/app/build/outputs/apk/debug/app-debug.apk
+          cp solapk/app/build/outputs/apk/debug/app-debug.apk SOL-Trading-AI.apk
+          ls -lh SOL-Trading-AI.apk
+          sha256sum SOL-Trading-AI.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SOL-Trading-AI-APK
+          path: SOL-Trading-AI.apk
+          if-no-files-found: error
+          retention-days: 7
